@@ -55,6 +55,7 @@ const (
 	ledgerOpSignTypedMessage ledgerOpcode = 0x0c // Signs an Ethereum message following the EIP 712 specification
 
 	ledgerP1DirectlyFetchAddress    ledgerParam1 = 0x00 // Return address directly from the wallet
+	ledgerP1FetchAndVerifyAddress   ledgerParam1 = 0x01 // Display address on device
 	ledgerP1InitTypedMessageData    ledgerParam1 = 0x00 // First chunk of Typed Message data
 	ledgerP1InitTransactionData     ledgerParam1 = 0x00 // First transaction data block for signing
 	ledgerP1ContTransactionData     ledgerParam1 = 0x80 // Subsequent transaction data block for signing
@@ -260,8 +261,16 @@ func (w *ledgerDriver) ledgerDerive(derivationPath []uint32) (common.Address, er
 	for i, component := range derivationPath {
 		binary.BigEndian.PutUint32(path[1+4*i:], component)
 	}
+	// Decide if address needs to be displayed
+	var param1 ledgerParam1
+	if _verifyLedgerAddress {
+		param1 = ledgerP1FetchAndVerifyAddress
+	} else {
+		param1 = ledgerP1DirectlyFetchAddress
+	}
+
 	// Send the request and wait for the response
-	reply, err := w.ledgerExchange(ledgerOpRetrieveAddress, ledgerP1DirectlyFetchAddress, ledgerP2DiscardAddressChainCode, path)
+	reply, err := w.ledgerExchange(ledgerOpRetrieveAddress, param1, ledgerP2DiscardAddressChainCode, path)
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -283,6 +292,12 @@ func (w *ledgerDriver) ledgerDerive(derivationPath []uint32) (common.Address, er
 		return common.Address{}, err
 	}
 	return address, nil
+}
+
+var _verifyLedgerAddress = false
+
+func SetVerifyLedgerAddres(verify bool) {
+	_verifyLedgerAddress = verify
 }
 
 // ledgerSign sends the transaction to the Ledger wallet, and waits for the user
